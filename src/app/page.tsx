@@ -1,23 +1,22 @@
-"use client"
-import { cn } from "cn";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { getQueryClient, trpc } from "@/trcp/server";
+import Client from "./Client";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { Suspense } from "react";
 
-const Page = () =>{
-  let [val , setval] = useState(0);
-  let somehing = true ;
+const Page = async () => {
+  const queryClient = getQueryClient();
+
+  void queryClient.prefetchQuery(trpc.getusers.queryOptions());
+
   return (
-    <>
-   <div className="min-h-screen min-w-screen flex items-center justify-center">
-    <Button onClick={()=>{
-     setval(val+1)
-    }}>click me </Button>
- 
-   </div>
-      <div>{val}</div>
-   </>
+    <div className="min-h-screen min-w-screen flex items-center justify-center">
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <Suspense fallback={<p>Loading...</p>}>
+          <Client />
+        </Suspense>
+      </HydrationBoundary>
+    </div>
   );
-}
+};
 
-
-export default Page ;
+export default Page;
