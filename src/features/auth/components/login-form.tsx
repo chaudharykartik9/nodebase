@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import Image from "next/image";
 
 const loginSchema = z.object({
   email: z.email("please Enter a valid email address"),
@@ -34,7 +35,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-    const router = useRouter();
+  const router = useRouter();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -44,19 +45,21 @@ export function LoginForm() {
   });
 
   const onsubmit = async (value: LoginFormValues) => {
-await authClient.signIn.email({
-  email: value.email,
-  password :value.password,
-  callbackURL:"/"
-},
-{
-  onSuccess:()=>{
-    router.push("/")
-  },
-  onError: (ctx)=>{
-    toast.error(ctx.error.message);
-  },
-})
+    await authClient.signIn.email(
+      {
+        email: value.email,
+        password: value.password,
+        callbackURL: "/",
+      },
+      {
+        onSuccess: () => {
+          router.push("/");
+        },
+        onError: (ctx) => {
+          toast.error(ctx.error.message);
+        },
+      },
+    );
   };
   const isPending = form.formState.isSubmitting;
 
@@ -78,6 +81,12 @@ await authClient.signIn.email({
                     type="button"
                     disabled={isPending}
                   >
+                    <Image
+                      alt="github"
+                      src="/logo/github.svg"
+                      width={20}
+                      height={20}
+                    />
                     Continue with Github
                   </Button>
                   <Button
@@ -86,6 +95,12 @@ await authClient.signIn.email({
                     type="button"
                     disabled={isPending}
                   >
+                    <Image
+                      alt="google"
+                      src="/logo/google.svg"
+                      width={20}
+                      height={20}
+                    />
                     Continue with Google
                   </Button>
                 </div>
