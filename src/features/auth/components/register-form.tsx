@@ -24,16 +24,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import Image from "next/image";
 
-const registerSchema = z.object({
-  email: z.email("please Enter a valid email address"),
-  password: z.string().min(1, "passsword is required"),
-  confirmpassword: z.string(),
-})
-.refine((data)=>data.password === data.confirmpassword,{
-  message : "password don't match", 
-  path: ["confirmpassword"]
-})
+const registerSchema = z
+  .object({
+    email: z.email("please Enter a valid email address"),
+    password: z.string().min(1, "passsword is required"),
+    confirmpassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmpassword, {
+    message: "password don't match",
+    path: ["confirmpassword"],
+  });
 
 type RegisterFormValue = z.infer<typeof registerSchema>;
 
@@ -45,27 +47,27 @@ export function RegisterForm() {
     defaultValues: {
       email: "",
       password: "",
-      confirmpassword:"",
+      confirmpassword: "",
     },
   });
 
   const onsubmit = async (value: RegisterFormValue) => {
-  await authClient.signUp.email(
-    {
-      name: value.email,
-      email: value.email,
-      password: value.password,
-      callbackURL :"/",
-    },{
-      onSuccess : ()=>{
-        router.push("/");
-
+    await authClient.signUp.email(
+      {
+        name: value.email,
+        email: value.email,
+        password: value.password,
+        callbackURL: "/",
       },
-      onError: (ctx) => {
-        toast.error(ctx.error.message);
+      {
+        onSuccess: () => {
+          router.push("/");
+        },
+        onError: (ctx) => {
+          toast.error(ctx.error.message);
+        },
       },
-    }
-  )
+    );
   };
   const isPending = form.formState.isSubmitting;
 
@@ -87,6 +89,12 @@ export function RegisterForm() {
                     type="button"
                     disabled={isPending}
                   >
+                    <Image
+                      alt="github"
+                      src="/logo/github.svg"
+                      width={20}
+                      height={20}
+                    />
                     Continue with Github
                   </Button>
                   <Button
@@ -95,6 +103,12 @@ export function RegisterForm() {
                     type="button"
                     disabled={isPending}
                   >
+                    <Image
+                      alt="google"
+                      src="/logo/google.svg"
+                      width={20}
+                      height={20}
+                    />
                     Continue with Google
                   </Button>
                 </div>
@@ -155,7 +169,7 @@ export function RegisterForm() {
                   </Button>
                 </div>
                 <div className="text-center text-sm">
-                already have an account  ?{" "}
+                  already have an account ?{" "}
                   <Link href="/login" className="underline underline-offset-4">
                     login
                   </Link>
