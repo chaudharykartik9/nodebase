@@ -13,7 +13,9 @@ A workflow-automation SaaS (n8n / Zapier style): users build node-based workflow
 - Tailwind CSS 4, shadcn/ui (`src/components/ui`), `sonner` toasts, `react-hook-form` + `zod` 4
 - Biome 2 for lint/format (not ESLint/Prettier)
 
-Planned (from the reference repo, not installed yet): `@xyflow/react` editor, Jotai, Inngest (+ realtime), `ai` SDK providers, Handlebars templating, Sentry, Polar billing, nuqs search params, superjson.
+Inngest v4 (background jobs; `src/inngest/`, route `api/inngest`; client must set `isDev` for local dev) + mprocs.
+
+Planned (from the reference repo, not installed yet): `@xyflow/react` editor, Jotai, `@inngest/realtime`, `ai` SDK providers, Handlebars templating, Sentry, Polar billing, nuqs search params, superjson.
 
 ## Commands
 
@@ -22,6 +24,7 @@ npm run dev          # next dev --turbopack
 npm run build        # next build --turbopack
 npm run lint         # biome check
 npm run format       # biome format --write
+npm run dev:all      # next + inngest dev server via mprocs (or `npm run inngest:dev` separately)
 npx prisma generate  # REQUIRED after clone / schema change (src/generated is gitignored)
 npx prisma migrate dev --name <snake_case_name>
 npx tsc --noEmit     # typecheck (no script defined; ignore stale errors under .next/)

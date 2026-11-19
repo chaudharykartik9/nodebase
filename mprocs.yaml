@@ -1,0 +1,8 @@
+# Run everything for local development with: npm run dev:all
+# (ngrok is added in T16 when webhook triggers need a public URL)
+procs:
+  next:
+    cmd: ["npm", "run", "dev"]
+
+  inngest:
+    cmd: ["npm", "run", "inngest:dev"]
