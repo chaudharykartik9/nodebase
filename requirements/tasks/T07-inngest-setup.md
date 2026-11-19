@@ -31,3 +31,6 @@ What a background job/queue is; events vs functions vs steps; retries and durabi
 
 ## Out of scope
 Workflow execution logic (T14), realtime (T15).
+
+## Outcome (2026-11-19)
+Done, see `requirements/reports/T07-inngest-setup-report.md`. Inngest **v4** was installed (reference used v3): triggers go inside the `createFunction` options and `isDev` must be set for local dev. T14/T15 must use the v4 API (check `@inngest/realtime` compatibility before T15).

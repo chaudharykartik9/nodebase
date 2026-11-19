@@ -69,3 +69,61 @@ Page load: `GET /` -> `page.tsx` (server) -> `requireAuth()` -> not logged in? r
 ### Things to remember
 - After changing the schema run `npx prisma generate` (the client in `src/generated` is gitignored) and restart `npm run dev`.
 - Never `migrate reset` on the shared Neon database.
+
+---
+
+## 07-inngest-setup: background jobs with Inngest and mprocs
+
+### What
+- **Inngest**: a service that runs *background jobs* ("functions") in response to *events*. Your app says "this happened" (`inngest.send(...)`), and Inngest calls your code back later, with retries.
+- **A background job**: code that runs outside the web request that started it. We added a small demo job, `hello-world`.
+- **mprocs**: a terminal tool that runs several commands side by side (here: the Next.js server and the Inngest dev server) with one command.
+
+### Why
+Running a workflow can take seconds or minutes (HTTP calls, AI models). A normal web request would time out, and if the server restarted halfway the work would be lost. Inngest runs the work in small saved **steps**: if step 3 fails it retries only step 3, and `step.sleep` can pause for days without holding a server open. This is the engine that will execute workflows in T14.
+
+### How: step by step
+1. Your code sends an event: `inngest.send({ name: "test/hello.world", data: { email } })`.
+2. The Inngest **dev server** (a local program on port 8288) receives it and finds functions listening to that event name.
+3. It calls your app over HTTP at `/api/inngest` to run the function. The function runs until it reaches a `step.*` call, reports the step's result back, and Inngest saves it.
+4. Inngest calls `/api/inngest` again for the next step (after the 2 s sleep, then the message step). When the function returns, the run is `Completed`.
+5. Each call re-runs the function from the top, but steps that already finished return their saved result instantly. That is why side effects must live inside `step.run`.
+
+### Where
+| File | Responsibility |
+|---|---|
+| `src/inngest/client.ts` | The Inngest client (`id: "nodebase"`). Sets dev mode from `NODE_ENV` |
+| `src/inngest/functions.ts` | Background jobs. `helloWorld` + the `functions` list |
+| `src/app/api/inngest/route.ts` | The URL Inngest calls to introspect/run our functions (`GET`, `POST`, `PUT`) |
+| `src/trcp/routers/_app.ts` | Temporary `testInngest` procedure: sends the test event (login required) |
+| `src/app/workflows-scratch.tsx` | Temporary "Test background job" button |
+| `mprocs.yaml` | Which processes `npm run dev:all` starts |
+| `package.json` | Scripts `inngest:dev`, `dev:all` |
+
+### Code explanation
+- `new Inngest({ id, isDev })`: `isDev` makes the SDK use the local dev server and skip signature checks. **Inngest v4 defaults to cloud mode** (needs `INNGEST_SIGNING_KEY`), so without this the route answers 500 "In cloud mode but no signing key found". The tutorial used v3, which detected dev mode by itself.
+- `inngest.createFunction({ id, triggers: [{ event }] }, handler)`: in v4 the trigger lives inside the options object (v3 had it as a second argument).
+- `step.sleep("wait-a-moment", "2s")`: durable pause. `step.run("build-message", fn)`: a retryable, saved unit of work. The first argument is the step's id and must be unique per function.
+- `serve({ client, functions })` from `inngest/next`: turns the list of functions into the route handlers. Forgetting to add a new function to the `functions` array means Inngest never sees it.
+- `testInngest` is a `protectedProcedure`: only a logged-in user can queue the job, and the user's email goes in the event data.
+- `inngest-cli dev -u http://localhost:3000/api/inngest`: starts the dev server and tells it where our app is.
+
+### Flow
+```
+Browser button --tRPC--> testInngest --inngest.send--> Inngest dev server (:8288)
+                                                          |  event "test/hello.world"
+                                                          v
+                         /api/inngest  <--HTTP calls--  runs hello-world step by step
+                         (sleep 2s -> "Hello, <email>!")  -> run Completed
+```
+You can watch runs in the browser at http://localhost:8288.
+
+### Examples
+- Run everything: `npm run dev:all` (mprocs starts Next + Inngest; use arrow keys to switch panes, `q` to quit) or run `npm run dev` and `npm run inngest:dev` in two terminals.
+- Sign in, click **Test background job**, open http://localhost:8288 -> Runs: `hello-world` completes in about 3 s with `{ message: "Hello, you@example.com!" }`.
+- Later (T14) an `execute-workflow` function replaces this demo and runs each workflow node as a step.
+
+### Things to remember
+- The Inngest dev server must be running, or `inngest.send` fails in dev.
+- `npm run inngest:dev` expects the app on port 3000 (change `-u` if you use another port).
+- In production you need `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` (T21).

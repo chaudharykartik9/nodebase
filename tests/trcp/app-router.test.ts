@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, getSession } = vi.hoisted(() => ({
+const { prismaMock, getSession, inngestSend } = vi.hoisted(() => ({
   prismaMock: {
     workflow: { findMany: vi.fn(), create: vi.fn() },
   },
   getSession: vi.fn(),
+  inngestSend: vi.fn(),
 }));
+
+vi.mock("@/inngest/client", () => ({ inngest: { send: inngestSend } }));
 
 vi.mock("@/lib/db", () => ({ default: prismaMock }));
 vi.mock("@/lib/auth", () => ({ auth: { api: { getSession } } }));
@@ -95,6 +98,40 @@ describe("appRouter (T06)", () => {
       expect(prismaMock.workflow.create).toHaveBeenCalledWith({
         data: { name: "test-workflow", userId: "user-A" },
       });
+    });
+  });
+
+  describe("testInngest (T07)", () => {
+    it("rejects unauthenticated callers and sends no event", async () => {
+      getSession.mockResolvedValue(null);
+      await expect(caller().testInngest()).rejects.toMatchObject({
+        code: "UNAUTHORIZED",
+      });
+      expect(inngestSend).not.toHaveBeenCalled();
+    });
+
+    it("sends the test event with the signed-in user's email", async () => {
+      getSession.mockResolvedValue({
+        user: { id: "user-A", email: "a@b.test" },
+        session: { id: "s1" },
+      });
+      inngestSend.mockResolvedValue({ ids: ["evt1"] });
+
+      await expect(caller().testInngest()).resolves.toEqual({ success: true });
+      expect(inngestSend).toHaveBeenCalledWith({
+        name: "test/hello.world",
+        data: { email: "a@b.test" },
+      });
+    });
+
+    it("surfaces failures when Inngest is unreachable", async () => {
+      getSession.mockResolvedValue({
+        user: { id: "user-A", email: "a@b.test" },
+        session: { id: "s1" },
+      });
+      inngestSend.mockRejectedValue(new Error("connect ECONNREFUSED"));
+
+      await expect(caller().testInngest()).rejects.toThrow("ECONNREFUSED");
     });
   });
 });
