@@ -24,7 +24,8 @@ npm run lint         # biome check
 npm run format       # biome format --write
 npx prisma generate  # REQUIRED after clone / schema change (src/generated is gitignored)
 npx prisma migrate dev --name <snake_case_name>
-npx tsc --noEmit     # typecheck (no script defined)
+npx tsc --noEmit     # typecheck (no script defined; ignore stale errors under .next/)
+npm test             # vitest run
 ```
 
 ## Layout
@@ -55,11 +56,14 @@ src/hooks/                  shared hooks
 
 ## Known quirks in current code (do not fix unprompted)
 
-- `src/app/page.tsx` is a `"use client"` scratch page that imports server-only `@/trcp/server` and `requireAuth`; it is a playground from the tRPC tutorial step.
-- `createTRPCContext` in `src/trcp/init.ts` returns a placeholder `userId`.
-- `getWorkFlows` filters workflows by the *user id* as the workflow id and `createWorkflow` ignores `userId`: the `workflow` model has no user relation yet.
-- Prisma model `workflow` is lowercase (reference uses `Workflow`).
+- `src/app/page.tsx` is a scratch page (server) rendering `workflows-scratch.tsx`; replaced by the dashboard in T08.
+- tRPC context (`src/trcp/init.ts`) is an empty object; identity comes from `protectedProcedure` (`ctx.auth`).
+- The demo procedures `getWorkFlows` / `createWorkflow` in `_app.ts` are temporary; replaced by a `workflows` feature router in T09.
+- Migration `20261119150000_workflow_user_relation` may still be unapplied: check `npx prisma migrate status` (it deletes old `workflow` test rows).
+- Old lint noise in `src/trcp/{client,init,query-client,server}` (unused imports, formatting) is pre-existing.
+- `User` still has a leftover `posts Post[]` relation/`Post` model from the Prisma starter.
 - `.env` needs `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`. Neon: use the **direct** (non-`-pooler`) URL for migrations.
+- Tests: `npm test` (Vitest, `tests/`). `vitest` is pinned to v3 because v5 needs `@types/node` >= 22.
 
 ## Target architecture (from the reference repo)
 
