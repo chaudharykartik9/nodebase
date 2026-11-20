@@ -1,39 +1,35 @@
-// "use client"
+"use client";
 
-import { requireAuth } from "@/lib/auth-utils";
-import { caller } from "@/trcp/server";
-import { LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import LogOutbutton from "./Logout-button";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trcp/client";
+import { toast } from "sonner";
 
-// import { authClient } from "@/lib/auth-client";
-// import { Button } from "@base-ui/react";
-// import { createAuthClient } from "better-auth/react";
+const page = () => {
+  const trpc = useTRPC();
+  const quieryCleint = useQueryClient() ;
+  const { data } = useQuery(trpc.getWorkflow.queryOptions());
+  const create = useMutation(trpc.createWorkflow.mutationOptions({
+    onSuccess : ()=>{
+      toast.success("Job queued");
+      // The background job sleeps 5s before inserting, so refetch after it finishes.
+      setTimeout(() => {
+        quieryCleint.invalidateQueries(trpc.getWorkflow.queryOptions());
+      }, 7000);
+    }
 
-// const Page =  () => {
+    
+  }));
 
-//   const {data} = authClient.useSession() ;
-//   return (
-//     <div className="min-h-screen min-w-screen flex items-center justify-center">
-//       {JSON.stringify(data)}
-//       {data &&(
-//       <Button onClick={()=>{authClient.signOut()}}>
-//         Logout
-//       </Button>)
-// }
-//     </div>
-//   );
-// };
-
-// export default Page;
-
-const page = async () => {
-  await requireAuth();
-  const data = await caller.getusers();
   return (
-    <div className="min-h-screen min-w-screen flex items-center justify-center">
-      protechde server component
-      <div>{JSON.stringify(data)}</div>
-      <LogOutbutton/>
+    <div className="min-h-screen min-w-screen flex flex-col items-center justify-center gap-y-6 p-4 text-center">
+      <p>protected server component</p>
+      <div className="max-w-full break-all">{JSON.stringify(data)}</div>
+      <Button disabled={create.isPending} onClick={() => create.mutate()}>
+        Create workflow
+      </Button>
+      <LogOutbutton />
     </div>
   );
 };
