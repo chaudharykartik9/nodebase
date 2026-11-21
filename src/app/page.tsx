@@ -18,6 +18,9 @@ const page = () => {
         //   quieryCleint.invalidateQueries(trpc.getWorkflow.queryOptions());
         // }, 7000);
       },
+    onError: (error) => {
+      toast.error(`Failed to queue AI job: ${error.message}`);
+    },
   }));
   const create = useMutation(
     trpc.createWorkflow.mutationOptions({
@@ -27,6 +30,9 @@ const page = () => {
         // setTimeout(() => {
         //   quieryCleint.invalidateQueries(trpc.getWorkflow.queryOptions());
         // }, 7000);
+      },
+      onError: (error) => {
+        toast.error(`Failed to create workflow: ${error.message}`);
       },
     }),
   );

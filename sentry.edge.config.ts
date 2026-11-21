@@ -1,0 +1,11 @@
+// Runs in the Edge runtime (middleware, edge routes). Loaded from src/instrumentation.ts.
+import * as Sentry from "@sentry/nextjs";
+
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+Sentry.init({
+  dsn,
+  enabled: Boolean(dsn),
+  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1,
+  debug: false,
+});

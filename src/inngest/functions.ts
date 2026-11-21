@@ -14,6 +14,12 @@ export const execute = inngest.createFunction(
       model: google("gemini-3.1-flash-lite"),
       system: "You are a helpful assistant.",
       prompt: "What is 2 + 2?",
+      // Lets Sentry's Vercel AI integration record the prompt and the answer.
+      experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+      },
     });
 
     return { steps };
