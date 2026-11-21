@@ -1,4 +1,6 @@
 import { auth } from '@/lib/auth';
+import { BILLING_ENABLED } from '@/config/constants';
+import { polarClient } from '@/lib/polar';
 import { initTRPC, TRPCError } from '@trpc/server';
 import next from 'next';
 import { headers } from 'next/headers';
@@ -41,3 +43,41 @@ export const protectedProcedure = baseProcedure.use(async({ctx, next}) =>{
   }
     return next({ctx :{ ...ctx , auth : session}});
 }) ;
+
+// Requires an active Polar subscription ("Pro").
+export const premiumProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    // Free mode: every logged-in user counts as Pro.
+    if (!BILLING_ENABLED) {
+      return next({ ctx: { ...ctx, customer: null } });
+    }
+
+    const forbidden = new TRPCError({
+      code: "FORBIDDEN",
+      message: "Active subscription required",
+    });
+
+    let customer;
+    try {
+      customer = await polarClient.customers.getStateExternal({
+        externalId: ctx.auth.user.id,
+      });
+    } catch (error) {
+      // Users who signed up before Polar was added have no Polar customer yet.
+      const status = (error as { statusCode?: number }).statusCode;
+      if (status === 404) {
+        throw forbidden;
+      }
+      throw error;
+    }
+
+    if (
+      !customer.activeSubscriptions ||
+      customer.activeSubscriptions.length === 0
+    ) {
+      throw forbidden;
+    }
+
+    return next({ ctx: { ...ctx, customer } });
+  },
+);
