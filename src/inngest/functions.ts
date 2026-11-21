@@ -1,5 +1,4 @@
 // src/inngest/functions.ts
-import prisma from "@/lib/db";
 import { inngest } from "./client";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
@@ -24,24 +23,4 @@ export const execute = inngest.createFunction(
 
     return { steps };
   },
-);
-
-export const processTask = inngest.createFunction(
-  { id: "process-task", triggers: { event: "app/task.created" } },
-  async ({ event, step }) => {
-    const result = await step.run("handle-task", async () => {
-      return { processed: true, id: event.data.id };
-    });
-
-    await step.sleep("pause", "5s");
-    await step.run("create-workflow", ()=>{
-        return prisma.workflow.create({
-            data:{
-                name:"test-workflow"
-            }
-        })
-    })
-
-    return { message: `Task ${event.data.id} complete`, result };
-  }
 );
