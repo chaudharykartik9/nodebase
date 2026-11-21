@@ -41,3 +41,18 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Claude AI helper files (local only, do not push)
+/.claude/
+/CLAUDE.md
+/repo.md
+/tasks/
+/PROJECT_OVERVIEW.md
+/ARCHITECTURE.md
+/DATABASE.md
+/PROJECT_STATUS.md
+/understand.md
+/requirements/
+
+# Sentry build plugin config (holds SENTRY_AUTH_TOKEN)
+.env.sentry-build-plugin
