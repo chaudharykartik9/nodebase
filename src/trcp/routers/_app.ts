@@ -1,23 +1,13 @@
+import { workflowsRouter } from "@/features/workflows/server/routers";
 import { inngest } from "@/inngest/client";
-import { createTRPCRouter, premiumProcedure, protectedProcedure } from "../init";
-import prisma from "@/lib/db";
-import { google } from "@ai-sdk/google";
-import { generateText } from "ai";
+import { createTRPCRouter, premiumProcedure } from "../init";
 
 export const appRouter = createTRPCRouter({
+  workflows: workflowsRouter,
+  // Kept from the AI-provider chapter: queues the Gemini demo job. No button calls it for now.
   testAi: premiumProcedure.mutation(async () => {
     await inngest.send({
-      name :"execute/ai"})
-   return { success: true, message: "job queued" };
-  }),
-  getWorkflow: protectedProcedure.query(() => {
-    return prisma.workflow.findMany();
-  }),
-  createWorkflow: protectedProcedure.mutation(async ({ ctx }) => {
-    // Queues a background job; the Inngest function creates the workflow.
-    await inngest.send({
-      name: "app/task.created",
-      data: { id: crypto.randomUUID(), userId: ctx.auth.user.id },
+      name: "execute/ai",
     });
     return { success: true, message: "job queued" };
   }),
