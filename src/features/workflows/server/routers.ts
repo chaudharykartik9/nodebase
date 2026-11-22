@@ -8,6 +8,7 @@ import { NodeType } from "@/generated/prisma/enums";
 import { WORKFLOW_CHANNEL_TOPICS, workflowChannel } from "@/inngest/channels";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
+import { signWorkflowWebhook } from "@/lib/webhook-token";
 import {
   createTRPCRouter,
   premiumProcedure,
@@ -30,6 +31,29 @@ export const workflowsRouter = createTRPCRouter({
         channel: workflowChannel(input.id),
         topics: [...WORKFLOW_CHANNEL_TOPICS],
       });
+    }),
+  // The webhook address for the Google Form trigger. It contains a secret token,
+  // so only the owner of the workflow gets it.
+  googleFormWebhook: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await prisma.workflow.findUniqueOrThrow({
+        where: { id: input.id, userId: ctx.auth.user.id },
+        select: { id: true },
+      });
+
+      const configured = process.env.NEXT_PUBLIC_APP_URL;
+      const baseUrl = (configured || "http://localhost:3000").replace(
+        /\/+$/,
+        "",
+      );
+      const token = signWorkflowWebhook(input.id);
+
+      return {
+        url: `${baseUrl}/api/webhooks/google-form?workflowId=${encodeURIComponent(input.id)}&token=${token}`,
+        // Google can only reach a public address, not localhost.
+        isPublic: !!configured && !/localhost|127\.0\.0\.1/.test(configured),
+      };
     }),
   // Starts a background run of a workflow that belongs to the current user.
   execute: protectedProcedure

@@ -46,7 +46,9 @@ const formSchema = z.object({
     .refine((name) => !RESERVED_NAMES.includes(name), {
       message: "This name is reserved, please choose another one",
     }),
-  endpoint: z.url({ message: "Please enter a valid URL" }),
+  // May contain {{variables}}, so it is checked as a real URL after they are
+  // filled in, when the workflow runs.
+  endpoint: z.string().min(1, { message: "Please enter a valid URL" }),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   body: z.string().optional(),
 });

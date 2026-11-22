@@ -1,6 +1,7 @@
 import { NonRetriableError } from "inngest";
 import toposort from "toposort";
 import type { Connection, Node } from "@/generated/prisma/client";
+import { inngest } from "./client";
 
 // Orders nodes so every node comes after the nodes that feed into it.
 export const topologicalSort = (
@@ -33,4 +34,17 @@ export const topologicalSort = (
 
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   return sortedNodeIds.map((id) => nodeMap.get(id)).filter((n) => !!n);
+};
+
+// Starts a workflow run. `id` makes the event idempotent: sending the same id
+// twice (for example when a webhook is delivered twice) only runs it once.
+export const sendWorkflowExecution = (
+  data: { workflowId: string; [key: string]: unknown },
+  id?: string,
+) => {
+  return inngest.send({
+    name: "workflows/execute.workflow",
+    data,
+    ...(id ? { id } : {}),
+  });
 };
