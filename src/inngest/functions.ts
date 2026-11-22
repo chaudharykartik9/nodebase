@@ -5,6 +5,7 @@ import { NonRetriableError } from "inngest";
 import { getExecutor } from "@/features/executions/lib/executor-registry";
 import type { NodeType } from "@/generated/prisma/enums";
 import prisma from "@/lib/db";
+import { workflowChannel } from "./channels";
 import { inngest } from "./client";
 import { topologicalSort } from "./utils";
 
@@ -41,6 +42,21 @@ export const executeWorkflow = inngest.createFunction(
       throw new NonRetriableError("Workflow ID is missing");
     }
 
+    // Live updates for the editor (see channels.ts). Publishing is a durable
+    // step, so each message is sent exactly once and is not repeated when
+    // Inngest replays this function. One message carries several updates,
+    // because every message costs one step.
+    const channel = workflowChannel(workflowId);
+    type StatusUpdate = {
+      nodeId: string;
+      status: "loading" | "success" | "error";
+    };
+    const publishStatus = (
+      stepId: string,
+      updates: StatusUpdate[],
+      reset = false,
+    ) => step.realtime.publish(stepId, channel.status, { reset, updates });
+
     const sortedNodes = await step.run("prepare-workflow", async () => {
       const workflow = await prisma.workflow.findUnique({
         where: { id: workflowId },
@@ -61,14 +77,44 @@ export const executeWorkflow = inngest.createFunction(
     // Start with any initial data from the trigger
     let context = event.data.initialData || {};
 
+    let previousNodeId: string | null = null;
     for (const node of sortedNodes) {
       const executor = getExecutor(node.type as NodeType);
-      context = await executor({
-        data: node.data as Record<string, unknown>,
-        nodeId: node.id,
-        context,
-        step,
-      });
+
+      // The previous node is done and this one starts: announce both at once.
+      // The first message of a run also tells the editor to clear old colours.
+      await publishStatus(
+        `status-before-${node.id}`,
+        [
+          ...(previousNodeId
+            ? [{ nodeId: previousNodeId, status: "success" as const }]
+            : []),
+          { nodeId: node.id, status: "loading" },
+        ],
+        previousNodeId === null,
+      );
+
+      try {
+        context = await executor({
+          data: node.data as Record<string, unknown>,
+          nodeId: node.id,
+          context,
+          step,
+        });
+      } catch (error) {
+        await publishStatus(`status-error-${node.id}`, [
+          { nodeId: node.id, status: "error" },
+        ]);
+        throw error;
+      }
+
+      previousNodeId = node.id;
+    }
+
+    if (previousNodeId) {
+      await publishStatus("status-after-last", [
+        { nodeId: previousNodeId, status: "success" },
+      ]);
     }
 
     return {

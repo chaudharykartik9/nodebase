@@ -1,9 +1,11 @@
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
+import { getClientSubscriptionToken } from "inngest/react";
 import { generateSlug } from "random-word-slugs";
 import z from "zod";
 import { PAGINATION } from "@/config/constants";
 import { NodeType } from "@/generated/prisma/enums";
+import { WORKFLOW_CHANNEL_TOPICS, workflowChannel } from "@/inngest/channels";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import {
@@ -13,6 +15,22 @@ import {
 } from "@/trcp/init";
 
 export const workflowsRouter = createTRPCRouter({
+  // A short-lived token that lets the browser listen to the live updates of one
+  // workflow. Only the owner of the workflow gets one, and it only works for
+  // that workflow's channel.
+  realtimeToken: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await prisma.workflow.findUniqueOrThrow({
+        where: { id: input.id, userId: ctx.auth.user.id },
+        select: { id: true },
+      });
+
+      return getClientSubscriptionToken(inngest, {
+        channel: workflowChannel(input.id),
+        topics: [...WORKFLOW_CHANNEL_TOPICS],
+      });
+    }),
   // Starts a background run of a workflow that belongs to the current user.
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
