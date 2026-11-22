@@ -1,5 +1,6 @@
 "use client";
 
+import { useAtomValue } from "jotai";
 import { SaveIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -15,14 +16,39 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   useSuspenseWorkflow,
+  useUpdateWorkflow,
   useUpdateWorkflowName,
 } from "@/features/workflows/hooks/use-workflows";
+import type { NodeType } from "@/generated/prisma/enums";
+import { editorAtom } from "../store/atoms";
 
-export const EditorSaveButton = (_props: { workflowId: string }) => {
-  // Placeholder: saving nodes and connections arrives with the editor chapters.
+export const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
+  const editor = useAtomValue(editorAtom);
+  const saveWorkflow = useUpdateWorkflow();
+
+  const handleSave = () => {
+    if (!editor) {
+      return;
+    }
+
+    saveWorkflow.mutate({
+      id: workflowId,
+      // A node without a valid type is rejected by the server with an error message.
+      nodes: editor.getNodes().map((node) => ({
+        ...node,
+        type: node.type as NodeType,
+      })),
+      edges: editor.getEdges(),
+    });
+  };
+
   return (
     <div className="ml-auto">
-      <Button size="sm" onClick={() => {}} disabled={false}>
+      <Button
+        size="sm"
+        onClick={handleSave}
+        disabled={!editor || saveWorkflow.isPending}
+      >
         <SaveIcon className="size-4" />
         Save
       </Button>
