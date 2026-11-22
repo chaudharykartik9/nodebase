@@ -188,7 +188,7 @@ export const HttpRequestDialog = ({
                   <FormLabel>Endpoint URL</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="https://api.example.com/users/{{httpResponse.data.id}}"
+                      placeholder="https://api.example.com/users/{{myApiCall.httpResponse.data.id}}"
                       {...field}
                     />
                   </FormControl>
@@ -210,7 +210,7 @@ export const HttpRequestDialog = ({
                     <FormControl>
                       <Textarea
                         placeholder={
-                          '{\n  "userId": "{{httpResponse.data.id}}",\n  "name": "{{httpResponse.data.name}}",\n  "items": "{{httpResponse.data.items}}"\n}'
+                          '{\n  "userId": "{{myApiCall.httpResponse.data.id}}",\n  "name": {{json myApiCall.httpResponse.data.name}},\n  "items": {{json myApiCall.httpResponse.data.items}}\n}'
                         }
                         className="min-h-[120px] font-mono text-sm"
                         {...field}
