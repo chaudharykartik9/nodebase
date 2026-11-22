@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { BILLING_ENABLED } from '@/config/constants';
 import { polarClient } from '@/lib/polar';
 import { initTRPC, TRPCError } from '@trpc/server';
+import superjson from 'superjson';
 import next from 'next';
 import { headers } from 'next/headers';
 import { unauthorized } from 'next/navigation';
@@ -22,7 +23,7 @@ const t = initTRPC.create({
   /**
    * @see https://trpc.io/docs/server/data-transformers
    */
-  // transformer: superjson,
+  transformer: superjson,
 });
 
 // Base router and procedure helpers
