@@ -22,6 +22,10 @@ import { ErrorView, LoadingView } from "@/components/entity-components";
 import { nodeComponents } from "@/config/node-components";
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows";
 import { NodeType } from "@/generated/prisma/enums";
+import {
+  NodeStatusProvider,
+  useWorkflowStatuses,
+} from "../hooks/use-workflow-status";
 import { editorAtom } from "../store/atoms";
 import { AddNodeButton } from "./add-node-button";
 import { ExecuteWorkflowButton } from "./execute-workflow-button";
@@ -36,6 +40,9 @@ export const EditorError = () => {
 
 export const Editor = ({ workflowId }: { workflowId: string }) => {
   const { data: workflow } = useSuspenseWorkflow(workflowId);
+
+  // Live status of every node while a workflow runs.
+  const nodeStatuses = useWorkflowStatuses(workflowId);
 
   // Share the canvas instance so the header's Save button can read it.
   const setEditor = useSetAtom(editorAtom);
@@ -67,34 +74,36 @@ export const Editor = ({ workflowId }: { workflowId: string }) => {
   );
 
   return (
-    <div className="size-full">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={nodeComponents}
-        onInit={setEditor}
-        fitView
-        snapGrid={[10, 10]}
-        snapToGrid
-        panOnScroll
-        panOnDrag={false}
-        selectionOnDrag
-      >
-        <Background />
-        <Controls />
-        <MiniMap />
-        <Panel position="top-right">
-          <AddNodeButton />
-        </Panel>
-        {hasManualTrigger && (
-          <Panel position="bottom-center">
-            <ExecuteWorkflowButton workflowId={workflowId} />
+    <NodeStatusProvider value={nodeStatuses}>
+      <div className="size-full">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeComponents}
+          onInit={setEditor}
+          fitView
+          snapGrid={[10, 10]}
+          snapToGrid
+          panOnScroll
+          panOnDrag={false}
+          selectionOnDrag
+        >
+          <Background />
+          <Controls />
+          <MiniMap />
+          <Panel position="top-right">
+            <AddNodeButton />
           </Panel>
-        )}
-      </ReactFlow>
-    </div>
+          {hasManualTrigger && (
+            <Panel position="bottom-center">
+              <ExecuteWorkflowButton workflowId={workflowId} />
+            </Panel>
+          )}
+        </ReactFlow>
+      </div>
+    </NodeStatusProvider>
   );
 };
