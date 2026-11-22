@@ -16,10 +16,12 @@ import {
   Panel,
   ReactFlow,
 } from "@xyflow/react";
+import { useSetAtom } from "jotai";
 import { useCallback, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { nodeComponents } from "@/config/node-components";
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows";
+import { editorAtom } from "../store/atoms";
 import { AddNodeButton } from "./add-node-button";
 
 export const EditorLoading = () => {
@@ -33,7 +35,10 @@ export const EditorError = () => {
 export const Editor = ({ workflowId }: { workflowId: string }) => {
   const { data: workflow } = useSuspenseWorkflow(workflowId);
 
-  // Local canvas state. Saving it to the database arrives in a later chapter.
+  // Share the canvas instance so the header's Save button can read it.
+  const setEditor = useSetAtom(editorAtom);
+
+  // Local canvas state. The Save button writes it to the database.
   const [nodes, setNodes] = useState<Node[]>(workflow.nodes);
   const [edges, setEdges] = useState<Edge[]>(workflow.edges);
 
@@ -62,7 +67,13 @@ export const Editor = ({ workflowId }: { workflowId: string }) => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeComponents}
+        onInit={setEditor}
         fitView
+        snapGrid={[10, 10]}
+        snapToGrid
+        panOnScroll
+        panOnDrag={false}
+        selectionOnDrag
       >
         <Background />
         <Controls />

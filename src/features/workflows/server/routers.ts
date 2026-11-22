@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import z from "zod";
@@ -35,6 +36,99 @@ export const workflowsRouter = createTRPCRouter({
           id: input.id,
           userId: ctx.auth.user.id,
         },
+      });
+    }),
+  // Replaces the workflow's whole canvas (nodes and connections) in one transaction.
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        nodes: z.array(
+          z.object({
+            id: z.string(),
+            // Only known node types can be saved.
+            type: z.enum(NodeType),
+            position: z.object({ x: z.number(), y: z.number() }),
+            data: z.record(z.string(), z.any()).optional(),
+          }),
+        ),
+        edges: z.array(
+          z.object({
+            source: z.string(),
+            target: z.string(),
+            sourceHandle: z.string().nullish(),
+            targetHandle: z.string().nullish(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, nodes, edges } = input;
+
+      const workflow = await prisma.workflow.findUniqueOrThrow({
+        where: { id, userId: ctx.auth.user.id },
+      });
+
+      const nodeIds = new Set(nodes.map((node) => node.id));
+      if (nodeIds.size !== nodes.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Duplicate node ids",
+        });
+      }
+
+      // Connections must join nodes that are part of this same save.
+      if (edges.some((e) => !nodeIds.has(e.source) || !nodeIds.has(e.target))) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A connection points to a node that does not exist",
+        });
+      }
+
+      // The same pair of handles can only be connected once.
+      const uniqueEdges = [
+        ...new Map(
+          edges.map((edge) => [
+            `${edge.source}|${edge.target}|${edge.sourceHandle}|${edge.targetHandle}`,
+            edge,
+          ]),
+        ).values(),
+      ];
+
+      return await prisma.$transaction(async (tx) => {
+        // Delete existing nodes (their connections are deleted with them)
+        await tx.node.deleteMany({
+          where: { workflowId: id },
+        });
+
+        await tx.node.createMany({
+          data: nodes.map((node) => ({
+            id: node.id,
+            workflowId: id,
+            name: node.type,
+            type: node.type,
+            position: node.position,
+            data: node.data || {},
+          })),
+        });
+
+        await tx.connection.createMany({
+          data: uniqueEdges.map((edge) => ({
+            workflowId: id,
+            fromNodeId: edge.source,
+            toNodeId: edge.target,
+            fromOutput: edge.sourceHandle || "main",
+            toInput: edge.targetHandle || "main",
+          })),
+        });
+
+        // Bump the workflow's updatedAt
+        await tx.workflow.update({
+          where: { id },
+          data: { updatedAt: new Date() },
+        });
+
+        return workflow;
       });
     }),
   updateName: protectedProcedure
