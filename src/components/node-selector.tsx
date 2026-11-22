@@ -32,6 +32,12 @@ const triggerNodes: NodeTypeOption[] = [
       "Runs the flow on clicking a button. Good for getting started quickly",
     icon: MousePointerIcon,
   },
+  {
+    type: NodeType.GOOGLE_FORM_TRIGGER,
+    label: "Google Form",
+    description: "Runs the flow when a Google Form is submitted",
+    icon: "/googleform.svg",
+  },
 ];
 
 const executionNodes: NodeTypeOption[] = [
@@ -43,8 +49,12 @@ const executionNodes: NodeTypeOption[] = [
   },
 ];
 
-// A workflow can only start from one trigger. Add new trigger types here.
-const TRIGGER_TYPES = new Set<NodeType>([NodeType.MANUAL_TRIGGER]);
+// A workflow can have one trigger of each kind (for example one manual trigger
+// and one Google Form trigger). Add new trigger types here.
+const TRIGGER_TYPES = new Set<NodeType>([
+  NodeType.MANUAL_TRIGGER,
+  NodeType.GOOGLE_FORM_TRIGGER,
+]);
 
 interface NodeSelectorProps {
   open: boolean;
@@ -99,14 +109,16 @@ export function NodeSelector({
 
   const handleNodeSelect = useCallback(
     (selection: NodeTypeOption) => {
-      // Only one trigger per workflow
+      // Only one trigger of each kind per workflow
       if (TRIGGER_TYPES.has(selection.type)) {
-        const hasTrigger = getNodes().some((node) =>
-          TRIGGER_TYPES.has(node.type as NodeType),
+        const alreadyThere = getNodes().some(
+          (node) => node.type === selection.type,
         );
 
-        if (hasTrigger) {
-          toast.error("Only one trigger is allowed per workflow");
+        if (alreadyThere) {
+          toast.error(
+            `Only one "${selection.label}" trigger is allowed per workflow`,
+          );
           return;
         }
       }
