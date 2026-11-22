@@ -3,6 +3,7 @@ import ky, { type Options as KyOptions } from "ky";
 import type { NodeExecutor } from "@/features/executions/types";
 
 type HttpRequestData = {
+  variableName?: string;
   endpoint?: string;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: string;
@@ -18,6 +19,18 @@ export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
   if (!data.endpoint) {
     throw new NonRetriableError(
       `HTTP Request node (${nodeId}): No endpoint configured`,
+    );
+  }
+
+  if (!data.variableName) {
+    throw new NonRetriableError(
+      `HTTP Request node (${nodeId}): Variable name not configured`,
+    );
+  }
+  const variableName = data.variableName;
+  if (["__proto__", "constructor", "prototype"].includes(variableName)) {
+    throw new NonRetriableError(
+      `HTTP Request node (${nodeId}): "${variableName}" is not a valid variable name`,
     );
   }
 
@@ -53,12 +66,16 @@ export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
       ? await response.json()
       : await response.text();
 
+    // The result is stored under the node's variable name, so several HTTP
+    // nodes in one workflow keep their own results.
     return {
       ...context,
-      httpResponse: {
-        status: response.status,
-        statusText: response.statusText,
-        data: responseData,
+      [variableName]: {
+        httpResponse: {
+          status: response.status,
+          statusText: response.statusText,
+          data: responseData,
+        },
       },
     };
   });

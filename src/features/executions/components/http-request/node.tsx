@@ -7,6 +7,7 @@ import { BaseExecutionNode } from "../base-execution-node";
 import { type FormType, HttpRequestDialog } from "./dialog";
 
 type HttpRequestNodeData = {
+  variableName?: string;
   endpoint?: string;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: string;
@@ -17,7 +18,7 @@ type HttpRequestNodeType = Node<HttpRequestNodeData>;
 
 export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { setNodes } = useReactFlow();
+  const { setNodes, getNodes } = useReactFlow();
 
   // Live status arrives when workflows can run (later chapter).
   const nodeStatus = "initial";
@@ -33,6 +34,7 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
             ...node,
             data: {
               ...node.data,
+              variableName: values.variableName,
               endpoint: values.endpoint,
               method: values.method,
               body: values.body,
@@ -44,9 +46,16 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
     );
   };
 
+  // Variable names used by the other nodes (checked when the dialog is saved).
+  const getTakenNames = () =>
+    getNodes()
+      .filter((node) => node.id !== props.id)
+      .map((node) => node.data?.variableName)
+      .filter((name): name is string => typeof name === "string" && !!name);
+
   const nodeData = props.data;
   const description = nodeData?.endpoint
-    ? `${nodeData.method || "GET"}: ${nodeData.endpoint}`
+    ? `${nodeData.variableName ? `${nodeData.variableName} = ` : ""}${nodeData.method || "GET"}: ${nodeData.endpoint}`
     : "Not configured";
 
   return (
@@ -55,6 +64,8 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSubmit={handleSubmit}
+        getTakenNames={getTakenNames}
+        defaultVariableName={nodeData.variableName}
         defaultEndpoint={nodeData.endpoint}
         defaultMethod={nodeData.method}
         defaultBody={nodeData.body}
