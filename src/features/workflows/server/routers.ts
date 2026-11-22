@@ -38,7 +38,8 @@ export const workflowsRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => {
-      return prisma.workflow.findUnique({
+      // Throws when the workflow does not exist or belongs to someone else.
+      return prisma.workflow.findUniqueOrThrow({
         where: { id: input.id, userId: ctx.auth.user.id },
       });
     }),
