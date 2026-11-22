@@ -32,7 +32,20 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+// Names that would break (or pollute) the context object the results are stored in.
+const RESERVED_NAMES = ["__proto__", "constructor", "prototype"];
+
 const formSchema = z.object({
+  variableName: z
+    .string()
+    .min(1, { message: "Variable name is required" })
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, {
+      message:
+        "Variable name must start with a letter or underscore and contain only letters, numbers, and underscores",
+    })
+    .refine((name) => !RESERVED_NAMES.includes(name), {
+      message: "This name is reserved, please choose another one",
+    }),
   endpoint: z.url({ message: "Please enter a valid URL" }),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   body: z.string().optional(),
@@ -44,6 +57,9 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
+  // Variable names already used by the other nodes of the workflow.
+  getTakenNames?: () => string[];
+  defaultVariableName?: string;
   defaultEndpoint?: string;
   defaultMethod?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   defaultBody?: string;
@@ -53,6 +69,8 @@ export const HttpRequestDialog = ({
   open,
   onOpenChange,
   onSubmit,
+  getTakenNames,
+  defaultVariableName = "",
   defaultEndpoint = "",
   defaultMethod = "GET",
   defaultBody = "",
@@ -60,6 +78,7 @@ export const HttpRequestDialog = ({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      variableName: defaultVariableName,
       endpoint: defaultEndpoint,
       method: defaultMethod,
       body: defaultBody,
@@ -70,17 +89,34 @@ export const HttpRequestDialog = ({
   useEffect(() => {
     if (open) {
       form.reset({
+        variableName: defaultVariableName,
         endpoint: defaultEndpoint,
         method: defaultMethod,
         body: defaultBody,
       });
     }
-  }, [open, defaultEndpoint, defaultMethod, defaultBody, form]);
+  }, [
+    open,
+    defaultVariableName,
+    defaultEndpoint,
+    defaultMethod,
+    defaultBody,
+    form,
+  ]);
 
+  const watchVariableName = form.watch("variableName") || "myApiCall";
   const watchMethod = form.watch("method");
   const showBodyField = ["POST", "PUT", "PATCH"].includes(watchMethod);
 
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
+    // Two nodes with the same name would overwrite each other's result.
+    if (getTakenNames?.().includes(values.variableName)) {
+      form.setError("variableName", {
+        message: "Another node already uses this variable name",
+      });
+      return;
+    }
+
     onSubmit(values);
     onOpenChange(false);
   };
@@ -99,6 +135,23 @@ export const HttpRequestDialog = ({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-8 mt-4"
           >
+            <FormField
+              control={form.control}
+              name="variableName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Variable Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="myApiCall" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    The result is stored under this name. Other nodes can use it
+                    as {`{{${watchVariableName}.httpResponse.data}}`}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="method"
