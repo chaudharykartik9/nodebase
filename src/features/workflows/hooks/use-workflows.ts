@@ -114,3 +114,22 @@ export const useUpdateWorkflow = () => {
     }),
   );
 };
+
+/**
+ * Hook to start a workflow run
+ */
+export const useExecuteWorkflow = () => {
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.workflows.execute.mutationOptions({
+      onSuccess: (data) => {
+        // The run happens in the background, so this only confirms it started.
+        toast.success(`Workflow "${data.name}" started`);
+      },
+      onError: (error) => {
+        toast.error(`Failed to execute workflow: ${error.message}`);
+      },
+    }),
+  );
+};
