@@ -2,7 +2,7 @@
 
 import { createId } from "@paralleldrive/cuid2";
 import { useReactFlow } from "@xyflow/react";
-import { GlobeIcon, MousePointerIcon } from "lucide-react";
+import { CreditCardIcon, GlobeIcon, MousePointerIcon } from "lucide-react";
 import Image from "next/image";
 import { useCallback } from "react";
 import { toast } from "sonner";
@@ -38,6 +38,12 @@ const triggerNodes: NodeTypeOption[] = [
     description: "Runs the flow when a Google Form is submitted",
     icon: "/googleform.svg",
   },
+  {
+    type: NodeType.STRIPE_TRIGGER,
+    label: "Stripe Event",
+    description: "Runs the flow when a Stripe event happens",
+    icon: CreditCardIcon,
+  },
 ];
 
 const executionNodes: NodeTypeOption[] = [
@@ -54,6 +60,7 @@ const executionNodes: NodeTypeOption[] = [
 const TRIGGER_TYPES = new Set<NodeType>([
   NodeType.MANUAL_TRIGGER,
   NodeType.GOOGLE_FORM_TRIGGER,
+  NodeType.STRIPE_TRIGGER,
 ]);
 
 interface NodeSelectorProps {
