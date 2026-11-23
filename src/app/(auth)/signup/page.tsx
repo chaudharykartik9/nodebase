@@ -1,9 +1,20 @@
 import { RegisterForm } from "@/features/auth/components/register-form";
 import { requireUnauth } from "@/lib/auth-utils";
+import { getSocialProviderAvailability } from "@/lib/social-providers";
 
-const page = async () => {
+type Props = {
+  searchParams: Promise<{ error?: string }>;
+};
+
+const page = async ({ searchParams }: Props) => {
   await requireUnauth();
-  return <RegisterForm />;
+  const { error } = await searchParams;
+  return (
+    <RegisterForm
+      socialProviders={getSocialProviderAvailability()}
+      socialError={error}
+    />
+  );
 };
 
 export default page;

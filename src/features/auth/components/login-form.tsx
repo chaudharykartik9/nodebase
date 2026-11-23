@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -24,7 +24,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { socialErrorMessage } from "@/features/auth/lib/social-errors";
 import { authClient } from "@/lib/auth-client";
+import type { SocialProviderAvailability } from "@/lib/social-providers";
 import Image from "next/image";
 
 const loginSchema = z.object({
@@ -34,7 +36,13 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+export function LoginForm({
+  socialProviders,
+  socialError,
+}: {
+  socialProviders: SocialProviderAvailability;
+  socialError?: string;
+}) {
   const router = useRouter();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -62,6 +70,37 @@ export function LoginForm() {
     );
   };
   const isPending = form.formState.isSubmitting;
+  const [socialPending, setSocialPending] = useState<string | null>(null);
+
+  // A cancelled or failed social sign-in comes back here with ?error=...
+  useEffect(() => {
+    if (socialError) {
+      toast.error(socialErrorMessage(socialError));
+      router.replace("/login");
+    }
+  }, [socialError, router]);
+
+  // Coming back with the browser's back button must not leave the buttons disabled.
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) setSocialPending(null);
+    };
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
+
+  const signInSocial = async (provider: "github" | "google") => {
+    setSocialPending(provider);
+    await authClient.signIn.social(
+      { provider, callbackURL: "/", errorCallbackURL: "/login" },
+      {
+        onError: (ctx) => {
+          setSocialPending(null);
+          toast.error(ctx.error.message);
+        },
+      },
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -74,36 +113,44 @@ export function LoginForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onsubmit)}>
               <div className="grid gap-6">
-                <div className="flex flex-col gap-4">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
-                  >
-                    <Image
-                      alt="github"
-                      src="/logo/github.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with Github
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
-                  >
-                    <Image
-                      alt="google"
-                      src="/logo/google.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with Google
-                  </Button>
-                </div>
+                {(socialProviders.github || socialProviders.google) && (
+                  <div className="flex flex-col gap-4">
+                    {socialProviders.github && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        type="button"
+                        onClick={() => signInSocial("github")}
+                        disabled={isPending || !!socialPending}
+                      >
+                        <Image
+                          alt="github"
+                          src="/logo/github.svg"
+                          width={20}
+                          height={20}
+                        />
+                        Continue with Github
+                      </Button>
+                    )}
+                    {socialProviders.google && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        type="button"
+                        onClick={() => signInSocial("google")}
+                        disabled={isPending || !!socialPending}
+                      >
+                        <Image
+                          alt="google"
+                          src="/logo/google.svg"
+                          width={20}
+                          height={20}
+                        />
+                        Continue with Google
+                      </Button>
+                    )}
+                  </div>
+                )}
                 <div className="grid gap-6">
                   <FormField
                     control={form.control}

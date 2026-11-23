@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "./db";
 import { polarClient, requireEnv } from "./polar";
+import { getSocialProviders } from "./social-providers";
 
 export const auth = betterAuth({
     database: prismaAdapter(prisma, {
@@ -12,6 +13,8 @@ export const auth = betterAuth({
         enabled:true,
         autoSignIn: true
     },
+    // GitHub and Google, for the providers that are set up in .env
+    socialProviders: getSocialProviders(),
     plugins: [
         polar({
             client: polarClient,
