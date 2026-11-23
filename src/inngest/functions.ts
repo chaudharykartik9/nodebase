@@ -2,8 +2,9 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
+import { toStoredOutput } from "@/features/executions/lib/execution-output";
 import { getExecutor } from "@/features/executions/lib/executor-registry";
-import type { NodeType } from "@/generated/prisma/enums";
+import { ExecutionStatus, type NodeType } from "@/generated/prisma/enums";
 import prisma from "@/lib/db";
 import { workflowChannel } from "./channels";
 import { inngest } from "./client";
@@ -33,9 +34,36 @@ export const execute = inngest.createFunction(
 
 // Runs a workflow: loads its nodes, orders them by their connections, and runs
 // each node's executor in turn, passing the context from one node to the next.
+//
+// Every run is recorded as an `Execution`: it is created when the run starts
+// (status RUNNING), set to SUCCESS with the output when the run ends, and set
+// to FAILED with the error by `onFailure` when it ends in an error.
 export const executeWorkflow = inngest.createFunction(
-  { id: "execute-workflow", triggers: { event: "workflows/execute.workflow" } },
-  async ({ event, step }) => {
+  {
+    id: "execute-workflow",
+    triggers: { event: "workflows/execute.workflow" },
+    // Runs once the run has failed for good: a node threw a NonRetriableError,
+    // or the retries are used up. A run that is still being retried stays RUNNING.
+    onFailure: async ({ event, step }) => {
+      await step.run("mark-execution-failed", async () => {
+        // updateMany: a run that failed before its record existed (for example
+        // a workflow that was not found) simply has nothing to update.
+        await prisma.execution.updateMany({
+          where: {
+            inngestRunId: event.data.run_id,
+            status: ExecutionStatus.RUNNING,
+          },
+          data: {
+            status: ExecutionStatus.FAILED,
+            error: event.data.error.message,
+            errorStack: event.data.error.stack,
+            completedAt: new Date(),
+          },
+        });
+      });
+    },
+  },
+  async ({ event, step, runId }) => {
     const workflowId = event.data.workflowId;
 
     if (!workflowId) {
@@ -72,6 +100,15 @@ export const executeWorkflow = inngest.createFunction(
         if (!workflow) {
           throw new NonRetriableError(`Workflow ${workflowId} not found`);
         }
+
+        // The record is created before anything can fail (for example a cycle
+        // found while ordering the nodes), so every failure is recorded. The
+        // upsert makes a repeated attempt of this step harmless.
+        await prisma.execution.upsert({
+          where: { inngestRunId: runId },
+          create: { workflowId, inngestRunId: runId },
+          update: {},
+        });
 
         return {
           userId: workflow.userId,
@@ -123,6 +160,17 @@ export const executeWorkflow = inngest.createFunction(
         { nodeId: previousNodeId, status: "success" },
       ]);
     }
+
+    await step.run("complete-execution", async () => {
+      await prisma.execution.update({
+        where: { inngestRunId: runId },
+        data: {
+          status: ExecutionStatus.SUCCESS,
+          completedAt: new Date(),
+          output: toStoredOutput(context),
+        },
+      });
+    });
 
     return {
       workflowId,
