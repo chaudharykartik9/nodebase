@@ -14,6 +14,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { AI_PROVIDERS } from "@/features/executions/components/ai/providers";
 import { NodeType } from "@/generated/prisma/enums";
 import { Separator } from "./ui/separator";
 
@@ -23,6 +24,16 @@ export type NodeTypeOption = {
   description: string;
   icon: React.ComponentType<{ className?: string }> | string;
 };
+
+// Gemini, OpenAI and Anthropic share the same node, only the provider differs.
+const AI_NODE_OPTIONS: NodeTypeOption[] = Object.values(AI_PROVIDERS).map(
+  (provider) => ({
+    type: provider.nodeType,
+    label: provider.label,
+    description: provider.description,
+    icon: provider.icon,
+  }),
+);
 
 const triggerNodes: NodeTypeOption[] = [
   {
@@ -53,6 +64,7 @@ const executionNodes: NodeTypeOption[] = [
     description: "Makes an HTTP request",
     icon: GlobeIcon,
   },
+  ...AI_NODE_OPTIONS,
 ];
 
 // A workflow can have one trigger of each kind (for example one manual trigger
