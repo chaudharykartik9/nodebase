@@ -15,6 +15,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { AI_PROVIDERS } from "@/features/executions/components/ai/providers";
+import { MESSAGE_PROVIDERS } from "@/features/executions/components/message-webhooks/providers";
 import { NodeType } from "@/generated/prisma/enums";
 import { Separator } from "./ui/separator";
 
@@ -34,6 +35,16 @@ const AI_NODE_OPTIONS: NodeTypeOption[] = Object.values(AI_PROVIDERS).map(
     icon: provider.icon,
   }),
 );
+
+// Discord and Slack share the same node, only the provider differs.
+const MESSAGE_NODE_OPTIONS: NodeTypeOption[] = Object.values(
+  MESSAGE_PROVIDERS,
+).map((provider) => ({
+  type: provider.nodeType,
+  label: provider.label,
+  description: provider.description,
+  icon: provider.icon,
+}));
 
 const triggerNodes: NodeTypeOption[] = [
   {
@@ -65,6 +76,7 @@ const executionNodes: NodeTypeOption[] = [
     icon: GlobeIcon,
   },
   ...AI_NODE_OPTIONS,
+  ...MESSAGE_NODE_OPTIONS,
 ];
 
 // A workflow can have one trigger of each kind (for example one manual trigger

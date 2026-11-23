@@ -8,6 +8,10 @@ import {
   openAiExecutor,
 } from "../components/ai/executor";
 import { httpRequestExecutor } from "../components/http-request/executor";
+import {
+  discordExecutor,
+  slackExecutor,
+} from "../components/message-webhooks/executor";
 import type { NodeExecutor } from "../types";
 
 // Maps every node type to the code that runs it. New node types are added here.
@@ -20,6 +24,8 @@ export const executorRegistry: Record<NodeType, NodeExecutor> = {
   [NodeType.GEMINI]: geminiExecutor,
   [NodeType.OPENAI]: openAiExecutor,
   [NodeType.ANTHROPIC]: anthropicExecutor,
+  [NodeType.DISCORD]: discordExecutor,
+  [NodeType.SLACK]: slackExecutor,
 };
 
 export const getExecutor = (type: NodeType): NodeExecutor => {
