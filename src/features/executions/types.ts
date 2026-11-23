@@ -8,6 +8,9 @@ export type StepTools = GetStepTools<Inngest.Any>;
 export interface NodeExecutorParams<TData = Record<string, unknown>> {
   data: TData;
   nodeId: string;
+  // The owner of the workflow. Anything an executor loads for a user (such as a
+  // saved credential) must be scoped to this id.
+  userId: string;
   context: WorkflowContext;
   step: StepTools;
 }

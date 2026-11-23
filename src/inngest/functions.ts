@@ -57,22 +57,28 @@ export const executeWorkflow = inngest.createFunction(
       reset = false,
     ) => step.realtime.publish(stepId, channel.status, { reset, updates });
 
-    const sortedNodes = await step.run("prepare-workflow", async () => {
-      const workflow = await prisma.workflow.findUnique({
-        where: { id: workflowId },
-        include: {
-          nodes: true,
-          connections: true,
-        },
-      });
+    const { userId, sortedNodes } = await step.run(
+      "prepare-workflow",
+      async () => {
+        const workflow = await prisma.workflow.findUnique({
+          where: { id: workflowId },
+          include: {
+            nodes: true,
+            connections: true,
+          },
+        });
 
-      // A missing workflow can never succeed, so do not retry.
-      if (!workflow) {
-        throw new NonRetriableError(`Workflow ${workflowId} not found`);
-      }
+        // A missing workflow can never succeed, so do not retry.
+        if (!workflow) {
+          throw new NonRetriableError(`Workflow ${workflowId} not found`);
+        }
 
-      return topologicalSort(workflow.nodes, workflow.connections);
-    });
+        return {
+          userId: workflow.userId,
+          sortedNodes: topologicalSort(workflow.nodes, workflow.connections),
+        };
+      },
+    );
 
     // Start with any initial data from the trigger
     let context = event.data.initialData || {};
@@ -98,6 +104,7 @@ export const executeWorkflow = inngest.createFunction(
         context = await executor({
           data: node.data as Record<string, unknown>,
           nodeId: node.id,
+          userId,
           context,
           step,
         });

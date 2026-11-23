@@ -4,6 +4,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { APICallError, generateText, type LanguageModel } from "ai";
 import { NonRetriableError } from "inngest";
 import type { NodeExecutor } from "@/features/executions/types";
+import prisma from "@/lib/db";
+import { decrypt } from "@/lib/encryption";
 import { renderTemplate } from "../../lib/template";
 import {
   AI_PROVIDERS,
@@ -13,6 +15,9 @@ import {
 
 type AiNodeData = {
   variableName?: string;
+  // A saved credential (see the Credentials page). Without one, the key from
+  // `.env` is used.
+  credentialId?: string;
   model?: string;
   systemPrompt?: string;
   userPrompt?: string;
@@ -57,7 +62,7 @@ const readText = (result: unknown): string => {
 const createAiExecutor = (
   provider: AiProviderConfig,
 ): NodeExecutor<AiNodeData> => {
-  return async ({ data, nodeId, context, step }) => {
+  return async ({ data, nodeId, userId, context, step }) => {
     const label = `${provider.label} node (${nodeId})`;
 
     // Configuration mistakes can never succeed on retry.
@@ -74,11 +79,47 @@ const createAiExecutor = (
       throw new NonRetriableError(`${label}: User prompt not configured`);
     }
 
-    const apiKey = process.env[provider.envVar];
-    if (!apiKey) {
-      throw new NonRetriableError(
-        `${label}: ${provider.envVar} is not set. Add it to .env and restart the app.`,
-      );
+    let apiKey: string;
+    if (data.credentialId) {
+      const credentialId = data.credentialId;
+
+      // Only the encrypted value is loaded inside the step, so Inngest never
+      // stores the plain key. It is decrypted right here, only to make the call.
+      const credential = await step.run("get-credential", async () => {
+        const found = await prisma.credential.findUnique({
+          // Scoped to the owner of the workflow, never to just the id.
+          where: { id: credentialId, userId },
+          select: { value: true, type: true },
+        });
+        return found;
+      });
+
+      if (!credential) {
+        throw new NonRetriableError(
+          `${label}: the selected credential was not found. It may have been deleted. Pick another one in the node settings.`,
+        );
+      }
+      if (credential.type !== provider.id) {
+        throw new NonRetriableError(
+          `${label}: the selected credential is for another provider. Pick a ${provider.label} credential.`,
+        );
+      }
+
+      try {
+        apiKey = decrypt(credential.value);
+      } catch (error) {
+        throw new NonRetriableError(
+          `${label}: ${error instanceof Error ? error.message : "could not read the credential"}`,
+        );
+      }
+    } else {
+      const envKey = process.env[provider.envVar];
+      if (!envKey) {
+        throw new NonRetriableError(
+          `${label}: no credential selected and ${provider.envVar} is not set. Pick a credential in the node settings, or add the key to .env and restart the app.`,
+        );
+      }
+      apiKey = envKey;
     }
 
     // Fill in {{variables}} from earlier nodes, outside the retried step.

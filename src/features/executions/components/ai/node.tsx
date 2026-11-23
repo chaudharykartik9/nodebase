@@ -9,6 +9,7 @@ import { AI_PROVIDERS, type AiProviderId } from "./providers";
 
 type AiNodeData = {
   variableName?: string;
+  credentialId?: string;
   model?: string;
   systemPrompt?: string;
   userPrompt?: string;
