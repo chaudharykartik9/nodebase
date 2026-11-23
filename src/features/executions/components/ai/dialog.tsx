@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import z from "zod";
@@ -23,8 +24,19 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials";
 import type { AiProviderConfig } from "./providers";
+
+// The dropdown cannot hold an empty value, so "no credential" has its own value.
+const NO_CREDENTIAL = "__env__";
 
 // Names that would break (or pollute) the context object the results are stored in.
 const RESERVED_NAMES = ["__proto__", "constructor", "prototype"];
@@ -40,6 +52,8 @@ const formSchema = z.object({
     .refine((name) => !RESERVED_NAMES.includes(name), {
       message: "This name is reserved, please choose another one",
     }),
+  // Empty means: use the key from .env.
+  credentialId: z.string().optional(),
   model: z.string().min(1, { message: "Model is required" }),
   systemPrompt: z.string().optional(),
   userPrompt: z.string().min(1, { message: "User prompt is required" }),
@@ -67,6 +81,7 @@ export const AiDialog = ({
 }: Props) => {
   const initial = {
     variableName: defaultValues.variableName ?? "",
+    credentialId: defaultValues.credentialId ?? "",
     model: defaultValues.model || provider.defaultModel,
     systemPrompt: defaultValues.systemPrompt ?? "",
     userPrompt: defaultValues.userPrompt ?? "",
@@ -84,6 +99,7 @@ export const AiDialog = ({
   }, [
     open,
     initial.variableName,
+    initial.credentialId,
     initial.model,
     initial.systemPrompt,
     initial.userPrompt,
@@ -91,6 +107,14 @@ export const AiDialog = ({
   ]);
 
   const watchVariableName = form.watch("variableName") || "myAi";
+  const watchCredentialId = form.watch("credentialId") || "";
+
+  // The saved credentials of this provider (names only, never the keys).
+  const credentials = useCredentialsByType(provider.id, open);
+  const credentialMissing =
+    !!watchCredentialId &&
+    !!credentials.data &&
+    !credentials.data.some((credential) => credential.id === watchCredentialId);
 
   const handleSubmit = (values: AiFormType) => {
     // Two nodes with the same name would overwrite each other's result.
@@ -101,7 +125,7 @@ export const AiDialog = ({
       return;
     }
 
-    onSubmit(values);
+    onSubmit({ ...values, credentialId: values.credentialId || undefined });
     onOpenChange(false);
   };
 
@@ -138,6 +162,59 @@ export const AiDialog = ({
             />
             <FormField
               control={form.control}
+              name="credentialId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Credential</FormLabel>
+                  <Select
+                    onValueChange={(value) =>
+                      field.onChange(value === NO_CREDENTIAL ? "" : value)
+                    }
+                    value={field.value || NO_CREDENTIAL}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a credential" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_CREDENTIAL}>
+                        Use the key from .env ({provider.envVar})
+                      </SelectItem>
+                      {credentials.data?.map((credential) => (
+                        <SelectItem key={credential.id} value={credential.id}>
+                          {credential.name}
+                        </SelectItem>
+                      ))}
+                      {credentialMissing && (
+                        <SelectItem value={watchCredentialId} disabled>
+                          (deleted credential)
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    {credentialMissing ? (
+                      <span className="text-destructive">
+                        The saved credential no longer exists. Pick another one.{" "}
+                      </span>
+                    ) : null}
+                    Save {provider.label} keys on the{" "}
+                    <Link
+                      href="/credentials"
+                      target="_blank"
+                      className="underline"
+                    >
+                      Credentials page
+                    </Link>
+                    .
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="model"
               render={({ field }) => (
                 <FormItem>
@@ -145,10 +222,7 @@ export const AiDialog = ({
                   <FormControl>
                     <Input placeholder={provider.defaultModel} {...field} />
                   </FormControl>
-                  <FormDescription>
-                    {provider.modelHint}. The API key is read from{" "}
-                    <code>{provider.envVar}</code> in <code>.env</code>.
-                  </FormDescription>
+                  <FormDescription>{provider.modelHint}.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -20,6 +20,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   workflows     Workflow[]
+  credentials   Credential[]
 
   @@map("user")
 }
@@ -140,4 +141,26 @@ model Connection {
   updatedAt DateTime @updatedAt
 
   @@unique([fromNodeId, toNodeId, fromOutput, toInput])
+}
+
+enum CredentialType {
+  OPENAI
+  ANTHROPIC
+  GEMINI
+}
+
+// An API key saved by a user. `value` is encrypted (see src/lib/encryption.ts)
+// and is never sent to the browser.
+model Credential {
+  id        String         @id @default(cuid())
+  name      String
+  value     String
+  type      CredentialType
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
