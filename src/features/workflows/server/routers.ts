@@ -55,6 +55,30 @@ export const workflowsRouter = createTRPCRouter({
         isPublic: !!configured && !/localhost|127\.0\.0\.1/.test(configured),
       };
     }),
+  // The webhook address for the Stripe trigger. It contains a secret token, so
+  // only the owner of the workflow gets it. `secretConfigured` tells the dialog
+  // whether Stripe's signing secret is set (it is never sent to the browser).
+  stripeWebhook: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await prisma.workflow.findUniqueOrThrow({
+        where: { id: input.id, userId: ctx.auth.user.id },
+        select: { id: true },
+      });
+
+      const configured = process.env.NEXT_PUBLIC_APP_URL;
+      const baseUrl = (configured || "http://localhost:3000").replace(
+        /\/+$/,
+        "",
+      );
+      const token = signWorkflowWebhook(input.id);
+
+      return {
+        url: `${baseUrl}/api/webhooks/stripe?workflowId=${encodeURIComponent(input.id)}&token=${token}`,
+        isPublic: !!configured && !/localhost|127\.0\.0\.1/.test(configured),
+        secretConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+      };
+    }),
   // Starts a background run of a workflow that belongs to the current user.
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
